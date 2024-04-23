@@ -82,11 +82,7 @@ ui <- fluidPage(
              sidebarLayout(
                sidebarPanel(
                  checkboxGroupInput("complaintCategory", "Select Complaint Category:",
-                                    choices = c("Noise-related complaints",
-                                                "Transportation problems",
-                                                "Housing concerns",
-                                                "Safety and security",
-                                                "Environmental concerns"),
+                                    unique(data$Complaint.Category),
                                     selected = "Noise-related complaints"),
                  checkboxGroupInput("borough", "Select Borough:",
                                     choices = unique(data$Borough),

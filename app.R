@@ -7,7 +7,6 @@ library(dplyr)
 library(readr)
 library(leaflet.extras)
 library(ggplot2)
-library(lubridate)
 library(plotly)
 library(tidyr)
 library(data.table)
@@ -38,16 +37,10 @@ data = data %>%
       Borough %in% c("MANHATTAN") ~ "Manhattan",
       Borough %in% c("QUEENS") ~ "Queens",
       Borough %in% c("BRONX") ~ "Bronx",
-      Borough %in% c("STATEN ISLAND") ~ "Staten Island",
-      TRUE ~ "Other"
-    )
+      Borough %in% c("STATEN ISLAND") ~ "Staten Island"    )
   ) %>%
-  filter(
-    Borough != "Other",
-    !is.na(Longitude), !is.na(Latitude),
-    Longitude >= -74.257159, Longitude <= -73.699215,
-    Latitude >= 40.477399, Latitude <= 40.917577
-  )
+  filter(!is.na(Borough))
+
 
 
 # Renaming and shortening Community Board names
@@ -88,19 +81,23 @@ ui <- fluidPage(
     tabPanel("New York City Level", 
              sidebarLayout(
                sidebarPanel(
-                 checkboxGroupInput("complaintType", "Select Complaint Type:",
-                                    choices = unique(data$Complaint.Type),
-                                    selected = "Residential"),
+                 checkboxGroupInput("complaintCategory", "Select Complaint Category:",
+                                    choices = c("Noise-related complaints",
+                                                "Transportation problems",
+                                                "Housing concerns",
+                                                "Safety and security",
+                                                "Environmental concerns"),
+                                    selected = "Noise-related complaints"),
                  checkboxGroupInput("borough", "Select Borough:",
                                     choices = unique(data$Borough),
-                                    selected = "Manhattan")
+                                    selected = unique(data$Borough))
                ),
                mainPanel(
                  leafletOutput("map"),
                  hr(),
-                 h3("An Overview of Noise Complaints"),
-                 plotOutput("staticTypePlot"),
-                 plotOutput("staticBoroughPlot")
+                 h3("An Overview of Complaints"),
+                 plotlyOutput("type_plot"),
+                 plotlyOutput("borough_plot")
                )
              )
     ),
@@ -162,7 +159,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   filteredDataNYC <- reactive({
     data %>%
-      filter(Complaint.Type %in% input$complaintType, Borough %in% input$borough)
+      filter(Complaint.Category %in% input$complaintCategory, Borough %in% input$borough)
   })
   
   filteredDataTS <- reactive({
@@ -226,6 +223,38 @@ server <- function(input, output) {
                  blur = 20, max = 0.05, radius = 15)
   })
   
+  output$type_plot <- renderPlotly({
+    type_summary <- data %>%
+      filter(!Complaint.Category %in% c("Sanitation issues", "Others")) %>%
+      group_by(Complaint.Category) %>%
+      summarise(Total_Complaints = n()) %>%
+      arrange(desc(Total_Complaints))  # Sort in descending order of complaints
+    
+    p <- ggplot(type_summary, aes(x = reorder(Complaint.Category, -Total_Complaints), y = Total_Complaints, text = paste("Total Complaints:", Total_Complaints))) +
+      geom_bar(stat = "identity") +
+      theme_minimal() +
+      labs(title = "Total Complaints by Complaint Category", x = "Complaint Type", y = "Total Complaints") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    
+    ggplotly(p, tooltip = "text")  # Make it interactive with tooltips
+  })
+  
+  # Render interactive plot for total complaints by borough
+  output$borough_plot <- renderPlotly({
+    borough_summary <- data %>%
+      group_by(Borough) %>%
+      summarise(Total_Complaints = n()) %>%
+      arrange(desc(Total_Complaints))  # Ensure data is sorted in descending order
+    
+    p <- ggplot(borough_summary, aes(x = reorder(Borough, -Total_Complaints), y = Total_Complaints, text = paste("Total Complaints:", Total_Complaints))) +
+      geom_bar(stat = "identity") +
+      theme_minimal() +
+      labs(title = "Total Complaints by Borough", x = "Borough", y = "Total Complaints") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    
+    ggplotly(p, tooltip = "text")  # Make it interactive with tooltips
+  })
+  
   output$timeSeriesPlot <- renderPlotly({
     req(input$dateInput)
     time_filtered_data <- filteredDataTS() %>%
@@ -243,21 +272,7 @@ server <- function(input, output) {
     ggplotly(p)  # Convert ggplot object to plotly interactive plot
   })
   
-  # Static plot renderings for complaint types in descending order
-  output$staticTypePlot <- renderPlot({
-    ggplot(data = data %>% count(Complaint.Type) %>% arrange(desc(n)), aes(x = reorder(Complaint.Type, n), y = n)) +
-      geom_bar(stat = "identity", fill = "steelblue") +
-      theme_minimal() +
-      labs(title = "Overall Distribution of Complaints by Type", x = "Complaint Type", y = "Count")
-  })
   
-  # Static plot renderings for boroughs in descending order
-  output$staticBoroughPlot <- renderPlot({
-    ggplot(data = data %>% count(Borough) %>% arrange(desc(n)), aes(x = reorder(Borough, n), y = n)) +
-      geom_bar(stat = "identity", fill = "tomato") +
-      theme_minimal() +
-      labs(title = "Overall Distribution of Complaints by Borough", x = "Borough", y = "Count")
-  })
   
   agency_filtered_data <- reactive({
     if (input$complaintCategory == "All") {

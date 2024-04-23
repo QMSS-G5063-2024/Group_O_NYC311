@@ -1,15 +1,24 @@
 ########## Load necessary libraries dynamically ########## 
-packages <-
-  c("shiny", "shinythemes", "leaflet", "dplyr", "readr", "leaflet.extras", "ggplot2",
-    "lubridate", "plotly", "tidyr", "data.table", "highr", "ggthemes", "highcharter", "DT", 
-    "tidytext", "wordcloud","RColorBrewer")
 
-packages <- lapply(packages, FUN = function(x) {
-  if (!require(x, character.only = TRUE)) {
-    install.packages(x)
-    library(x, character.only = TRUE)
-  }
-})
+library(shiny)
+library(shinythemes)
+library(leaflet)
+library(dplyr)
+library(readr)
+library(leaflet.extras)
+library(ggplot2)
+library(lubridate)
+library(plotly)
+library(tidyr)
+library(data.table)
+library(highr)
+library(ggthemes)
+library(highcharter)
+library(DT)
+library(tidytext)
+library(wordcloud)
+library(RColorBrewer)
+
 
 ########## Loading and processing data ########## 
 

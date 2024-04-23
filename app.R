@@ -129,7 +129,7 @@ ui <- fluidPage(
              sidebarLayout(
                sidebarPanel(
                  selectInput("selectedAgency", "Select Agency:", choices = unique(data$Agency)),
-                 selectInput("complaintCategory", "Select Complaint Category:",
+                 selectInput("AgencycomplaintCategory", "Select Complaint Category:",
                              choices = c("All", "Noise-related complaints", "Safety and security", "Transportation problems", "Environmental concerns", "Housing concerns", "Sanitation issues", "Others")),
                  dateRangeInput("dateRange", "Select Date Range:", start = min(data$Created.Date, na.rm = TRUE), end = max(data$Created.Date, na.rm = TRUE))
                ),
@@ -153,9 +153,16 @@ ui <- fluidPage(
 ########## Define server logic
 
 server <- function(input, output) {
+
   filteredDataNYC <- reactive({
     data %>%
-      filter(Complaint.Category %in% input$complaintCategory, Borough %in% input$borough)
+      filter(Complaint.Category %in% input$complaintCategory,
+             Borough %in% input$borough,
+             !is.na(Longitude),  # Exclude missing longitude
+             !is.na(Latitude),   # Exclude missing latitude
+             Longitude != 0,     # Exclude invalid longitude
+             Latitude != 0       # Exclude invalid latitude
+      )
   })
   
   filteredDataTS <- reactive({
@@ -271,12 +278,12 @@ server <- function(input, output) {
   
   
   agency_filtered_data <- reactive({
-    if (input$complaintCategory == "All") {
+    if (input$AgencycomplaintCategory == "All") {
       data %>%
         filter(Agency == input$selectedAgency, Created.Date >= input$dateRange[1], Created.Date <= input$dateRange[2])
     } else {
       data %>%
-        filter(Agency == input$selectedAgency, Complaint.Category == input$complaintCategory, Created.Date >= input$dateRange[1], Created.Date <= input$dateRange[2])
+        filter(Agency == input$selectedAgency, Complaint.Category == input$AgencycomplaintCategory, Created.Date >= input$dateRange[1], Created.Date <= input$dateRange[2])
     }
   })
   
@@ -328,7 +335,7 @@ server <- function(input, output) {
       summarise(AverageResponse = mean(Response.Times, na.rm = TRUE)) %>%
       ungroup() %>%
       arrange(desc(AverageResponse))
-    title_text <- sprintf(" Average Response Time by Complaint Type", input$complaintCategory)
+    title_text <- sprintf(" Average Response Time by Complaint Type", input$AgencycomplaintCategory)
     p <- ggplot(df, aes(x = reorder(Complaint.Type, -AverageResponse), y = AverageResponse)) +
       geom_bar(stat = "identity", fill = "dodgerblue") +
       theme(axis.text.x = element_text(angle = 90, hjust = 1)) +

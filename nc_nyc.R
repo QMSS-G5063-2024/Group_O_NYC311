@@ -41,36 +41,13 @@ data = data %>%
   )
 
 
-# Subsetting the data further into 5 subsets based on Borough 
-# vector of all CD names
-temp = sort(unique(data$Community.Board))
-# Queens Borough CDs
-indices <- grep("QUEENS", temp)
-temp2 = temp[indices]
-Queens.CD = data[data$Community.Board %in% temp2, ]
-Queens.CD$Community.Board = gsub("QUEENS", "QN", Queens.CD$Community.Board)
-# Manhattan Borough CDs
-indices <- grep("MANHATTAN", temp)
-temp2 = temp[indices]
-Manhattan.CD = data[data$Community.Board %in% temp2, ]
-Manhattan.CD$Community.Board = gsub("MANHATTAN", "MN", Manhattan.CD$Community.Board)
-# Bronx Borough CDs
-indices <- grep("BRONX", temp)
-temp2 = temp[indices]
-Bronx.CD = data[data$Community.Board %in% temp2, ]
-Bronx.CD$Community.Board = gsub("BRONX", "BX", Bronx.CD$Community.Board)
-# Brooklyn Borough CDs
-indices <- grep("BROOKLYN", temp)
-temp2 = temp[indices]
-Brooklyn.CD = data[data$Community.Board %in% temp2, ]
-Brooklyn.CD$Community.Board = gsub("BRONX", "BX", Brooklyn.CD$Community.Board)
-# Staten Island Borough CDs
-indices <- grep("STATEN ISLAND", temp)
-temp2 = temp[indices]
-StatenIsland.CD = data[data$Community.Board %in% temp2, ]
-StatenIsland.CD$Community.Board = gsub("STATEN ISLAND", "SI", StatenIsland.CD$Community.Board)
-# clearing uneeded items
-rm(indices, temp2)
+# Renaming and shortening Community Board names
+data$Community.Board = gsub("QUEENS", "QN", data$Community.Board)
+data$Community.Board = gsub("MANHATTAN", "MN", data$Community.Board)
+data$Community.Board = gsub("BRONX", "BX", data$Community.Board)
+data$Community.Board = gsub("BROOKLYN", "BK", data$Community.Board)
+data$Community.Board = gsub("STATEN ISLAND", "SI", data$Community.Board)
+
 
 ##### CREATE DATAFRAME FOR CD DATA TABLE
 CD.DT.data = data %>%
@@ -137,6 +114,10 @@ ui <- fluidPage(
     
     tabPanel("NYC Community Districts", 
              fluidRow(
+               column(12, selectInput("CD_bar_borough", "Select Borough",
+                                      choices = unique(data$Borough),
+                                      selected = "Manhattan")
+               ),
                column(12, plotlyOutput("CD_Manhattan")),
                column(12,dataTableOutput("CD_NYC311_table"))
              )
@@ -208,14 +189,16 @@ server <- function(input, output) {
               extensions = c("Buttons", "Responsive"))
   })
   
-  CD_Manhattan_data = Manhattan.CD
+  CD_Manhattan_data = reactive({
+    data[data$Borough == input$CD_bar_borough, ]
+  })
   
   output$CD_Manhattan = renderPlotly({
-    ggplot(CD_Manhattan_data, aes(x = Community.Board, fill = Complaint.Category)) +
+    ggplot(CD_Manhattan_data(), aes(x = Community.Board, fill = Complaint.Category)) +
       geom_bar(position = "stack") +
       labs(title = "Breakdown Of NYC311 By Community District",
-           x = "Area",
-           y = "Number of Events") +
+           x = "Community Districts",
+           y = "Number of NYC311 Calls") +
       scale_fill_manual(values = c("Noise-related complaints" = "orange1", 
                                    "Transportation problems" = "dodgerblue",
                                    "Environmental concerns" = "lawngreen",

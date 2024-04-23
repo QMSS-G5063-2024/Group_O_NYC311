@@ -82,7 +82,14 @@ ui <- fluidPage(
              sidebarLayout(
                sidebarPanel(
                  checkboxGroupInput("complaintCategory", "Select Complaint Category:",
-                                    unique(data$Complaint.Category),
+                                    c("Noise-related complaints",
+                                      "Transportation problems",
+                                      "Environmental concerns",
+                                      "Housing concerns",
+                                      "Safety and security",
+                                      "Sanitation issues",
+                                      "Others"
+                                    ),
                                     selected = "Noise-related complaints"),
                  checkboxGroupInput("borough", "Select Borough:",
                                     choices = unique(data$Borough),
@@ -93,28 +100,33 @@ ui <- fluidPage(
                  hr(),
                  h3("An Overview of Complaints"),
                  plotlyOutput("type_plot"),
-                 plotlyOutput("borough_plot")
+                 plotlyOutput("borough_plot"),
+                 plotlyOutput("time_plot")
                )
              )
     ),
     
-    tabPanel("Time Series",
+    tabPanel("Borough Level",
              sidebarLayout(
                sidebarPanel(
-                 dateRangeInput("dateInput", "Select Date Range:",
-                                start = "2017-01-01", end = "2017-12-31"),
-                 checkboxGroupInput("complaintTypeTS", "Select Complaint Type (Time Series):",
-                                    choices = unique(data$Complaint.Type),
-                                    selected = unique(data$Complaint.Type))
+                 checkboxGroupInput("complaintCategory", "Select Complaint Category:",
+                                    c("Noise-related complaints",
+                                      "Transportation problems",
+                                      "Environmental concerns",
+                                      "Housing concerns",
+                                      "Safety and security",
+                                      "Sanitation issues",
+                                      "Others"
+                                    ),
+                                    selected = "Noise-related complaints")
                ),
                mainPanel(
-                 plotlyOutput("timeSeriesPlot"),
-                 leafletOutput("detailedMap")
+                 uiOutput("maps")
                )
              )
     ),
     
-    tabPanel("NYC Community Districts", 
+    tabPanel("NYC Community Districts Level", 
              fluidRow(
                column(12, selectInput("CD_bar_borough", "Select Borough",
                                       choices = unique(data$Borough),
@@ -125,7 +137,7 @@ ui <- fluidPage(
              )
     ),
     
-    tabPanel("NYC 311 Complaints By Agency",
+    tabPanel("Agency Level",
              sidebarLayout(
                sidebarPanel(
                  selectInput("selectedAgency", "Select Agency:", choices = unique(data$Agency)),
@@ -228,7 +240,6 @@ server <- function(input, output) {
   
   output$type_plot <- renderPlotly({
     type_summary <- data %>%
-      filter(!Complaint.Category %in% c("Sanitation issues", "Others")) %>%
       group_by(Complaint.Category) %>%
       summarise(Total_Complaints = n()) %>%
       arrange(desc(Total_Complaints))  # Sort in descending order of complaints
@@ -258,23 +269,50 @@ server <- function(input, output) {
     ggplotly(p, tooltip = "text")  # Make it interactive with tooltips
   })
   
-  output$timeSeriesPlot <- renderPlotly({
-    req(input$dateInput)
-    time_filtered_data <- filteredDataTS() %>%
-      mutate(DateOnly = as.Date(Created.Date)) %>%
-      filter(DateOnly >= as.Date(input$dateInput[1]), DateOnly <= as.Date(input$dateInput[2])) %>%
-      group_by(DateOnly, Complaint.Type) %>%
-      summarise(Count = n(), .groups = 'drop')
+  output$time_plot <- renderPlotly({
+    data_summary <- data %>%
+      group_by(Created.Date) %>%
+      summarise(complaint_count = n())
     
-    p <- ggplot(time_filtered_data, aes(x = DateOnly, y = Count, color = Complaint.Type, group = Complaint.Type)) +
-      geom_line() +
-      labs(title = "Time Series of Complaints", x = "Date", y = "Number of Complaints") +
-      theme_minimal() +
-      scale_x_date(date_breaks = "1 month", date_labels = "%b %Y")
-    
-    ggplotly(p)  # Convert ggplot object to plotly interactive plot
+    plot_ly(data_summary, x = ~Created.Date, y = ~complaint_count, type = 'scatter', mode = 'lines+markers',
+            hoverinfo = 'text',
+            text = ~paste('Date:', Created.Date, '<br>Number of Complaints:', complaint_count),
+            marker = list(size = 10, color = 'dodgerblue')) %>%
+      layout(
+        title = list(text = "Number of Complaints Over Time", x = 0),  # Left justify the title
+        xaxis = list(title = "Date"),  # Set the x-axis range
+        yaxis = list(title = "Number of Complaints"),
+        hovermode = 'closest')
   })
   
+  boroughs <- c("Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island")
+  
+  # Create a map output for each borough
+  output$maps <- renderUI({
+    tabs <- lapply(boroughs, function(b) {
+      tabPanel(b,
+               leafletOutput(outputId = paste0("map_", b))
+      )
+    })
+    do.call(tabsetPanel, tabs)
+  })
+  
+  # Generate maps based on the selected complaint category and borough
+  for (borough in boroughs) {
+    local({
+      b <- borough
+      output[[paste0("map_", b)]] <- renderLeaflet({
+        leaflet(data %>% filter(Borough == b, Complaint.Category == input$complaintCategory)) %>%
+          addProviderTiles(providers$CartoDB.Positron) %>%
+          addMarkers(
+            lng = ~Longitude,
+            lat = ~Latitude,
+            popup = ~paste(Complaint.Type, Descriptor, sep = "<br/>"),
+            clusterOptions = markerClusterOptions()
+          )
+      })
+    })
+  }
   
   
   agency_filtered_data <- reactive({

@@ -1,11 +1,11 @@
 name: Group_O_NYC311
-title: Group_O_NYC311
+title:
 username: jaydon
 account: jaydon
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 11836577
-bundleId: 8529521
+bundleId: 8529656
 url: https://jaydon.shinyapps.io/Group_O_NYC311/
 version: 1
 asMultiple: FALSE

@@ -320,19 +320,18 @@ server <- function(input, output) {
   
   output$agency_responseTimePlot <- renderPlotly({
     req(nrow(agency_filtered_data()) > 0)
-    data <- agency_filtered_data() %>%
+    df <- agency_filtered_data() %>%
       group_by(Complaint.Type) %>%
       summarise(AverageResponse = mean(Response.Times, na.rm = TRUE)) %>%
       ungroup() %>%
       arrange(desc(AverageResponse))
     title_text <- sprintf(" Average Response Time by Complaint Type", input$complaintCategory)
-    p <- ggplot(data, aes(x = reorder(Complaint.Type, -AverageResponse), y = AverageResponse)) +
+    p <- ggplot(df, aes(x = reorder(Complaint.Type, -AverageResponse), y = AverageResponse)) +
       geom_bar(stat = "identity", fill = "dodgerblue") +
       theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
       labs(title = title_text, x = "Complaint Type", y = "Average Response Time (minutes)")
     ggplotly(p)
   })
-  
   
 }
 

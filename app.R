@@ -27,7 +27,7 @@ data <- data %>%
   mutate(
     Created.Date = as.Date(Created.Date, format = "%Y-%m-%d"),
     Closed.Date = as.Date(Closed.Date, format = "%Y-%m-%d"),
-    Response.Times = round(difftime(Closed.Date, Created.Date, units = "mins"))
+    Response.Times = abs(round(difftime(Closed.Date, Created.Date, units = "hour")))
   )
 
 data = data %>%
@@ -146,10 +146,10 @@ ui <- fluidPage(
                  dateRangeInput("dateRange", "Select Date Range:", start = min(data$Created.Date, na.rm = TRUE), end = max(data$Created.Date, na.rm = TRUE))
                ),
                mainPanel(
-                 h3("Section 1: Total Number of Complaints by Agency"),
+                 h3("Section 1: Overview of Complaints and Response Times by Agency"),
                  plotlyOutput("agency_timeSeriesPlot"),
                  plotlyOutput("agency_responseTimePlot"),
-                 h3("Section 2: Most Frequent Words Used in Complaints"),
+                 h3("Section 2: Most Commonly Used Words received in Complaints by Agency"),
                  plotOutput("agency_wordCloud"),
                  plotlyOutput("agency_wordFreqPlot"))
              )
@@ -360,7 +360,7 @@ server <- function(input, output) {
       top_n(50, n)
     p <- ggplot(words, aes(x = reorder(word, n), y = n)) +
       geom_col() +
-      labs(title = "%s Top 50 Words received in Complaints", x = "Words", y = "Frequency") +
+      labs(title = sprintf("Top 50 most common words received in complaints by %s", input$selectedAgency), x = "Words", y = "Frequency") +
       theme_minimal() +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
     ggplotly(p)
@@ -377,7 +377,7 @@ server <- function(input, output) {
     p <- ggplot(df, aes(x = reorder(Complaint.Type, -AverageResponse), y = AverageResponse)) +
       geom_bar(stat = "identity", fill = "dodgerblue") +
       theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-      labs(title = title_text, x = "Complaint Type", y = "Average Response Time (minutes)")
+      labs(title = title_text, x = "Complaint Type", y = "Average Response Time (hours)")
     ggplotly(p)
   })
   

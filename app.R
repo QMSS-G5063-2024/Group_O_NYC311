@@ -50,6 +50,11 @@ data$Community.Board = gsub("BRONX", "BX", data$Community.Board)
 data$Community.Board = gsub("BROOKLYN", "BK", data$Community.Board)
 data$Community.Board = gsub("STATEN ISLAND", "SI", data$Community.Board)
 
+# removing some data that has wrong CD labels
+filter = (data$Borough=="Manhattan" & data$Community.Board == "08 BX") | 
+  (data$Borough=="Bronx" & data$Community.Board == "01 QN")
+
+data = data[! filter, ]
 
 ##### CREATE DATAFRAME FOR CD DATA TABLE
 CD.DT.data = data %>%
@@ -73,8 +78,45 @@ CD.DT.data = data %>%
 
 ui <- fluidPage(
   theme = shinytheme("yeti"),
-  titlePanel("Visualizing NYC 311 Noise Complaints"),
-  tags$h4("Choose your level of analysis using the various tabs!", class = "text-muted"),
+  
+  tags$head(
+    tags$link(rel = "stylesheet", href = "https://fonts.googleapis.com/css?family=Poppins:400,500,600,700"),
+    tags$style(HTML("
+      body {
+        font-family: 'Poppins', sans-serif;
+        background-color: #f8f9fa;
+        color: #343a40;
+      }
+      .header {
+        padding: 20px 0;
+        text-align: center;
+        background: linear-gradient(135deg, #3399ff, #0000cd);
+        color: #fff;
+        margin-bottom: 20px;
+        border-radius: 5px;
+      }
+    "))
+  ),
+  tags$div(class = "header",
+           h1(HTML("<strong>Analyzing NYC311 Complaint Data</strong>")),  
+           p(HTML("<i>Providing A Snapshot Of The Daily Lived Experiences Of New Yorkers</i>"),
+             HTML("<br>"),
+             HTML("<i>From Different Neighborhoods Across The City.</i>"))
+  ),
+  
+  tags$h2("Overview", style = "text-align: center;"),
+  
+  tags$h5("NYC311 is a platform where residents in New York City can report, inquire, and seek help on a vast array of issues covering areas including but not limited to public transport, environmental concerns, sanitation, and safety issues. Data from all calls made to NYC311 are made publicly available and provide an opportunity to understand what challenges residents of New York City go through on a daily basis. Data from NYC311 can be accessed at https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9/about_data.",
+          style = "text-align: justify;"),
+  
+  tags$h5("By exploring and visualizing key aspects of the NYC311 dataset, we hope to provide a deeper understanding on the types of issues and concerns that residents have, and also reveal underlying patterns and trends related to the NYC311 calls and their reported issues.",
+          style = "text-align: justify;"),
+  
+  tags$h5("Below, we provide several options to visualize the NYC311 data across several dimensions, including at the city-wide level, the borough-level, the community district-level, and at the NYC agency level. Click on the respective tabs below to view visualizations of the data along these dimensions.",
+          style = "text-align: justify;"),
+  
+  tags$h3("Choose your level of analysis using the various tabs!", class = "text-muted",
+          style = "text-align: center;"),
   
   tabsetPanel(
     
@@ -96,6 +138,8 @@ ui <- fluidPage(
                                     selected = unique(data$Borough))
                ),
                mainPanel(
+                 h3("Heat Map Of NYC311 Complaints"),
+                 tags$h5("The heat map below displays the concenration and variation in the number of NYC311 call across the entire city. The concentrations range from low (blue) to high (red)."),
                  leafletOutput("map"),
                  hr(),
                  h3("An Overview of Complaints"),
@@ -244,11 +288,22 @@ server <- function(input, output) {
       summarise(Total_Complaints = n()) %>%
       arrange(desc(Total_Complaints))  # Sort in descending order of complaints
     
-    p <- ggplot(type_summary, aes(x = reorder(Complaint.Category, -Total_Complaints), y = Total_Complaints, text = paste("Total Complaints:", Total_Complaints))) +
+    p <- ggplot(type_summary, aes(y = reorder(Complaint.Category, -Total_Complaints), x = Total_Complaints, fill = Complaint.Category, text = paste("Total Complaints:", Total_Complaints))) +
       geom_bar(stat = "identity") +
+      scale_fill_manual(values = c("Noise-related complaints" = "orange1", 
+                                   "Transportation problems" = "dodgerblue",
+                                   "Environmental concerns" = "lawngreen",
+                                   "Sanitation issues" = "black",
+                                   "Housing concerns" = "yellow",
+                                   "Safety and security" = "indianred1",
+                                   "Others" = "grey"))+
       theme_minimal() +
-      labs(title = "Total Complaints by Complaint Category", x = "Complaint Type", y = "Total Complaints") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      labs(title = "Total Complaints by Complaint Category", 
+           x = NULL,
+           y = NULL) +
+      theme(axis.text.x = element_text(hjust = 1),
+            axis.title.x = element_blank(),
+            axis.title.y = element_blank())
     
     ggplotly(p, tooltip = "text")  # Make it interactive with tooltips
   })
@@ -260,11 +315,17 @@ server <- function(input, output) {
       summarise(Total_Complaints = n()) %>%
       arrange(desc(Total_Complaints))  # Ensure data is sorted in descending order
     
-    p <- ggplot(borough_summary, aes(x = reorder(Borough, -Total_Complaints), y = Total_Complaints, text = paste("Total Complaints:", Total_Complaints))) +
+    p <- ggplot(borough_summary, aes(x = reorder(Borough, -Total_Complaints), 
+                                     y = Total_Complaints, 
+                                     text = paste("Total Complaints:", Total_Complaints))) +
       geom_bar(stat = "identity") +
       theme_minimal() +
-      labs(title = "Total Complaints by Borough", x = "Borough", y = "Total Complaints") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      labs(title = "Total Complaints by Borough",
+           x = NULL,
+           y = NULL) +
+      theme(axis.text.x = element_text(hjust = 1),
+            axis.title.x = element_blank(),
+            axis.title.y = element_blank())
     
     ggplotly(p, tooltip = "text")  # Make it interactive with tooltips
   })
@@ -281,7 +342,7 @@ server <- function(input, output) {
       layout(
         title = list(text = "Number of Complaints Over Time", x = 0),  # Left justify the title
         xaxis = list(title = "Date"),  # Set the x-axis range
-        yaxis = list(title = "Number of Complaints"),
+        yaxis = list(title = ""), 
         hovermode = 'closest')
   })
   
